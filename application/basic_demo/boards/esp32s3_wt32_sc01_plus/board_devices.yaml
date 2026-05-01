@@ -13,10 +13,13 @@ devices:
     config:
       x_max: 480
       y_max: 320
-      invert_color: false
-      need_reset: true
+      invert_color: true
+      need_reset: false                          # reset handled manually in setup_device.c
       rgb_ele_order: LCD_RGB_ELEMENT_ORDER_RGB
       data_endian: LCD_RGB_DATA_ENDIAN_BIG
+      swap_xy: true
+      mirror_x: false
+      mirror_y: false
       bits_per_pixel: 16
       bus_i80_config:
         dc_gpio_num: 0                       # LCD RS (Command/Data Selection)
@@ -24,21 +27,25 @@ devices:
         data_gpio_nums: [9, 46, 3, 8, 18, 17, 16, 15]  # LCD DB0..DB7
         bus_width: 8
         max_transfer_bytes: 307200           # 480*320*2 (16bpp full screen)
-        clk_src: LCD_CLK_SRC_DEFAULT
+        clk_src: LCD_CLK_SRC_PLL160M
+        dma_burst_size: 64
       io_i80_config:
         cs_gpio_num: -1                      # No CS used for this parallel LCD
-        pclk_hz: 16000000
+        pclk_hz: 10000000                    # 10 MHz as per ST7796 reference macro
         trans_queue_depth: 10
         lcd_cmd_bits: 8
         lcd_param_bits: 8
         dc_levels:
+          dc_idle_level: 0
           dc_cmd_level: 0
+          dc_dummy_level: 0
           dc_data_level: 1
         flags:
-          cs_active_high: false
+          cs_active_high: true
+          swap_color_bytes: false
       lcd_panel_config:
-        reset_gpio_num: 4
-        rgb_ele_order: LCD_RGB_ELEMENT_ORDER_RGB
+        reset_gpio_num: -1                         # reset handled manually in setup_device.c
+        rgb_ele_order: LCD_RGB_ELEMENT_ORDER_BGR
         data_endian: LCD_RGB_DATA_ENDIAN_BIG
         bits_per_pixel: 16
         flags:
@@ -66,15 +73,15 @@ devices:
         peripherals:
           - name: i2c_master
       touch_config:
-        x_max: 480
-        y_max: 320
-        rst_gpio_num: 4
+        x_max: 320
+        y_max: 480
+        rst_gpio_num: -1                          # reset handled manually in setup_device.c
         int_gpio_num: 7
         levels:
           reset: 0
           interrupt: 0
         flags:
-          swap_xy: false
+          swap_xy: true
           mirror_x: false
           mirror_y: false
 
