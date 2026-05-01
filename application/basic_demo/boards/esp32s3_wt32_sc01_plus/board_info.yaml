@@ -1,0 +1,5 @@
+board: esp32s3_wt32_sc01_plus
+chip: esp32s3
+version: 1.0.0
+description: "ESP32-S3 WT32-SC01 Plus Smart Panel Development Board"
+manufacturer: "Wireless Tag"

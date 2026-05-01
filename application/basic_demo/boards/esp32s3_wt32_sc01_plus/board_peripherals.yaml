@@ -1,0 +1,36 @@
+version: 1.0.0
+# Peripherals Configuration for ESP32-S3 WT32-SC01 Plus
+
+peripherals:
+  # I2C Configuration (Touch Panel FT6336U)
+  - name: i2c_master
+    type: i2c
+    role: master
+    config:
+      port: 0
+      pins:
+        sda: 6
+        scl: 5
+
+  # SPI Configuration (SD Card)
+  - name: spi_master
+    type: spi
+    role: master
+    config:
+      spi_bus_config:
+        spi_port: SPI2_HOST
+        mosi_io_num: 40
+        miso_io_num: 38
+        sclk_io_num: 39
+        max_transfer_sz: 4092
+
+  # Backlight Control (GPIO45)
+  - name: ledc_backlight
+    type: ledc
+    version: default
+    config:
+      gpio_num: 45
+      speed_mode: LEDC_LOW_SPEED_MODE
+      channel: 0
+      timer_sel: 0
+      duty: 0

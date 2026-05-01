@@ -1,0 +1,27 @@
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# WT32-SC01 Plus: 16 MB QIO flash @ 80 MHz
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+# WT32-SC01 Plus: 2 MB quad QSPI RAM @ 80 MHz
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+# Quad PSRAM (2 MB) does NOT support XIP on ESP32-S3.
+# Force code/data to stay in internal flash / RAM.
+CONFIG_SPIRAM_XIP_FROM_PSRAM=n
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=n
+CONFIG_SPIRAM_RODATA=n
+
+# Quad PSRAM cannot keep task stacks accessible while cache is disabled for a
+# flash transaction.  Force FreeRTOS to allocate stacks from internal RAM.
+CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM=n
+
+# Enable I80 LCD support (ESP32-S3 native parallel interface)
+CONFIG_ESP_BOARD_DEV_DISPLAY_LCD_SUB_I80_SUPPORT=y
+
+# Disable PARLIO LCD support (not available on ESP32-S3)
+CONFIG_ESP_BOARD_DEV_DISPLAY_LCD_SUB_PARLIO_SUPPORT=n
