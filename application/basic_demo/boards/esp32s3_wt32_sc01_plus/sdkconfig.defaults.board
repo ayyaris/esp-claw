@@ -25,3 +25,6 @@ CONFIG_ESP_BOARD_DEV_DISPLAY_LCD_SUB_I80_SUPPORT=y
 
 # Disable PARLIO LCD support (not available on ESP32-S3)
 CONFIG_ESP_BOARD_DEV_DISPLAY_LCD_SUB_PARLIO_SUPPORT=n
+
+# Increase HTTP server URI handler slots (needed for Lua runner endpoint)
+CONFIG_HTTPD_MAX_URI_HANDLERS=24

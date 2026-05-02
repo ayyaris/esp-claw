@@ -16,6 +16,7 @@
 #include "basic_demo_settings.h"
 #include "basic_demo_wifi.h"
 #include "cap_im_wechat.h"
+#include "cap_lua.h"
 #include "cJSON.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
@@ -262,6 +263,57 @@ static void json_read_string(cJSON *root, const char *key, char *buffer, size_t 
     if (cJSON_IsString(item)) {
         strlcpy(buffer, item->valuestring, buffer_size);
     }
+}
+
+static esp_err_t lua_run_handler(httpd_req_t *req)
+{
+    cJSON *root = NULL;
+    esp_err_t err = parse_json_body(req, &root);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON body");
+        return err;
+    }
+
+    cJSON *script_item = cJSON_GetObjectItemCaseSensitive(root, "script");
+    if (!cJSON_IsString(script_item) || !script_item->valuestring[0]) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'script' field");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *script = script_item->valuestring;
+    cJSON *args_item = cJSON_GetObjectItemCaseSensitive(root, "args_json");
+    const char *args_json = cJSON_IsString(args_item) ? args_item->valuestring : NULL;
+
+    char write_out[256];
+    char run_out[4096];
+
+    err = cap_lua_write_script("web_run.lua", script, true, write_out, sizeof(write_out));
+    if (err != ESP_OK) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, write_out);
+        return err;
+    }
+
+    err = cap_lua_run_script("web_run.lua", args_json, 10000, run_out, sizeof(run_out));
+
+    cJSON_Delete(root);
+
+    cJSON *resp = cJSON_CreateObject();
+    if (!resp) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddBoolToObject(resp, "ok", err == ESP_OK);
+    cJSON_AddStringToObject(resp, "output", run_out);
+    char *resp_str = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
+    esp_err_t send_err = httpd_resp_sendstr(req, resp_str ? resp_str : "{}");
+    free(resp_str);
+    return send_err;
 }
 
 static esp_err_t index_handler(httpd_req_t *req)
@@ -877,6 +929,7 @@ esp_err_t config_http_server_start(void)
         { .uri = "/api/files", .method = HTTP_DELETE, .handler = files_delete_handler },
         { .uri = "/api/files/upload", .method = HTTP_POST, .handler = files_upload_handler },
         { .uri = "/api/files/mkdir", .method = HTTP_POST, .handler = files_mkdir_handler },
+        { .uri = "/api/lua/run", .method = HTTP_POST, .handler = lua_run_handler },
         { .uri = "/files/*", .method = HTTP_GET, .handler = file_download_handler },
     };
 

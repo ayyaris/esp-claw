@@ -3,6 +3,9 @@ idf_component_register(
         "."
     INCLUDE_DIRS
         "."
+    REQUIRES
+        esp_driver_twai
+        cap_lua
     EMBED_TXTFILES
         "web/index.html"
         "web/styles.css"

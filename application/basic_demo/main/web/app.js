@@ -1402,6 +1402,37 @@ async function bootstrap() {
   }
 }
 
+// ── Lua Runner ──
+async function runLuaScript() {
+  const editor = document.getElementById("luaEditor");
+  const output = document.getElementById("luaOutput");
+  const script = editor.value;
+  if (!script.trim()) {
+    output.textContent = "Error: script is empty";
+    output.style.display = "block";
+    return;
+  }
+  output.textContent = "Running...";
+  output.style.display = "block";
+  try {
+    const res = await fetch("/api/lua/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ script }),
+    });
+    const data = await res.json();
+    output.textContent = data.output || "(no output)";
+  } catch (err) {
+    output.textContent = "Error: " + (err.message || "Failed to run script");
+  }
+}
+
+document.getElementById("runLuaButton")?.addEventListener("click", runLuaScript);
+document.getElementById("clearLuaButton")?.addEventListener("click", () => {
+  document.getElementById("luaEditor").value = "";
+  document.getElementById("luaOutput").style.display = "none";
+});
+
 bootstrap().catch((err) => {
   showBanner("configBanner", err.message || "Failed to initialize the page", true);
 });

@@ -105,3 +105,14 @@ devices:
       default_percent: 100
     peripherals:
       - name: ledc_backlight
+
+  # CAN Bus (TWAI)
+  - name: can_bus
+    type: custom
+    chip: twai
+    version: default
+    config:
+      tx_gpio: 10
+      rx_gpio: 11
+      bitrate: 500000
+      mode: normal
