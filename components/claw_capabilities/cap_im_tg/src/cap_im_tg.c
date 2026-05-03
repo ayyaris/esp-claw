@@ -15,15 +15,18 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "cJSON.h"
 #include "claw_task.h"
 #include "claw_event_publisher.h"
 #include "esp_crt_bundle.h"
 #include "esp_http_client.h"
+#include "esp_console.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/idf_additions.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -85,6 +88,7 @@ static cap_im_tg_state_t s_tg = {
     .enable_inbound_attachments = false,
     .next_update_id = 0,
 };
+static SemaphoreHandle_t s_tg_cli_mutex = NULL;
 
 static int64_t cap_im_tg_now_ms(void)
 {
@@ -582,6 +586,55 @@ static void cap_im_tg_queue_attachment(const char *chat_id,
     }
 }
 
+static esp_err_t cap_im_tg_run_cli_and_reply(const char *chat_id, const char *command)
+{
+    FILE *capture = fopen("/fatfs/.tg_cli_tmp.txt", "w+");
+    if (!capture) {
+        return cap_im_tg_send_text(chat_id, "Error: cannot open capture file");
+    }
+
+    xSemaphoreTake(s_tg_cli_mutex, portMAX_DELAY);
+
+    FILE *saved_stdout = stdout;
+    FILE *saved_stderr = stderr;
+    stdout = capture;
+    stderr = capture;
+
+    int cmd_ret = 0;
+    esp_err_t run_err = esp_console_run(command, &cmd_ret);
+
+    fflush(stdout);
+    stdout = saved_stdout;
+    stderr = saved_stderr;
+
+    long size = ftell(capture);
+    char *out_buf = NULL;
+    if (size > 0) {
+        out_buf = malloc(size + 1);
+        if (out_buf) {
+            rewind(capture);
+            fread(out_buf, 1, size, capture);
+            out_buf[size] = '\0';
+        }
+    }
+    fclose(capture);
+    unlink("/fatfs/.tg_cli_tmp.txt");
+
+    xSemaphoreGive(s_tg_cli_mutex);
+
+    if (!out_buf || !out_buf[0]) {
+        char no_out[128];
+        snprintf(no_out, sizeof(no_out), "done (ret=%d, err=%s)", cmd_ret, esp_err_to_name(run_err));
+        esp_err_t send_err = cap_im_tg_send_text(chat_id, no_out);
+        free(out_buf);
+        return send_err;
+    }
+
+    esp_err_t send_err = cap_im_tg_send_text(chat_id, out_buf);
+    free(out_buf);
+    return send_err;
+}
+
 static void cap_im_tg_handle_update(cJSON *update_json)
 {
     cJSON *update_id_json;
@@ -689,14 +742,21 @@ static void cap_im_tg_handle_update(cJSON *update_json)
 
     text_json = cJSON_GetObjectItem(message_json, "text");
     if (cJSON_IsString(text_json) && text_json->valuestring && text_json->valuestring[0]) {
+        const char *text = text_json->valuestring;
+        if (strncmp(text, "/cmd ", 5) == 0) {
+            const char *command = text + 5;
+            ESP_LOGI(TAG, "Telegram CLI from %s: %s", chat_id, command);
+            cap_im_tg_run_cli_and_reply(chat_id, command);
+            return;
+        }
         if (cap_im_tg_publish_inbound_text(chat_id,
                                            sender_id,
                                            message_id,
-                                           text_json->valuestring) == ESP_OK) {
+                                           text) == ESP_OK) {
             ESP_LOGI(TAG, "Telegram inbound %s: %.48s%s",
                      chat_id,
-                     text_json->valuestring,
-                     strlen(text_json->valuestring) > 48 ? "..." : "");
+                     text,
+                     strlen(text) > 48 ? "..." : "");
         } else {
             ESP_LOGW(TAG, "Failed to publish Telegram inbound message");
         }
@@ -1134,6 +1194,10 @@ static esp_err_t cap_im_tg_gateway_start(void)
         return ESP_OK;
     }
 
+    if (!s_tg_cli_mutex) {
+        s_tg_cli_mutex = xSemaphoreCreateMutex();
+    }
+
     s_tg.stop_requested = false;
     if (!s_tg.attachment_queue) {
         s_tg.attachment_queue = xQueueCreate(CAP_IM_TG_ATTACHMENT_QUEUE_LEN,
@@ -1160,7 +1224,7 @@ static esp_err_t cap_im_tg_gateway_start(void)
     }
     ok = claw_task_create(&(claw_task_config_t){
                               .name = "tg_poll",
-                              .stack_size = 6144,
+                              .stack_size = 12288,
                               .priority = 5,
                               .core_id = tskNO_AFFINITY,
                               .stack_policy = CLAW_TASK_STACK_PREFER_PSRAM,

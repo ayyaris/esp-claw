@@ -90,6 +90,7 @@
           <button type="button" class="tab-btn" data-tab="memory" data-i18n="tabMemory">Memory</button>
           <button type="button" class="tab-btn" data-tab="files" data-i18n="tabFiles">File Manager</button>
           <button type="button" class="tab-btn" data-tab="lua" data-i18n="tabLua">Lua</button>
+          <button type="button" class="tab-btn" data-tab="terminal" data-i18n="tabTerminal">Terminal</button>
         </div>
 
         <!-- ═══ CONFIG TAB ═══ -->
@@ -400,6 +401,48 @@
                 </div>
                 <textarea id="userEditor" class="memory-editor memory-editor-sm hidden" spellcheck="false"></textarea>
               </section>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ LUA TAB ═══ -->
+        <div class="tab-panel" id="tab-lua">
+          <div class="lua-panel">
+            <div id="luaBanner" class="banner"></div>
+            <div class="lua-header">
+              <h2 class="lua-title" data-i18n="luaTitle">Lua Scripts</h2>
+              <p class="lua-note" data-i18n="luaDescription">Run Lua scripts on the device.</p>
+            </div>
+            <div class="lua-section">
+              <h3 class="lua-subtitle" data-i18n="luaFiles">Script Files</h3>
+              <div id="luaFileList" class="lua-file-list"></div>
+            </div>
+            <div class="lua-section">
+              <h3 class="lua-subtitle" data-i18n="luaEditorLabel">Editor</h3>
+              <textarea id="luaEditor" class="lua-editor" spellcheck="false" placeholder="-- Write Lua code here..."></textarea>
+              <div class="lua-actions">
+                <button type="button" class="btn-primary btn-sm" id="runLuaButton" data-i18n="luaRun">Run</button>
+                <button type="button" class="btn-secondary btn-sm" id="clearLuaButton" data-i18n="luaClear">Clear</button>
+              </div>
+              <pre id="luaOutput" class="lua-output hidden"></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ TERMINAL TAB ═══ -->
+        <div class="tab-panel" id="tab-terminal">
+          <div class="terminal-panel">
+            <div id="terminalBanner" class="banner"></div>
+            <div class="terminal-header">
+              <h2 class="terminal-title" data-i18n="terminalTitle">Device Terminal</h2>
+              <p class="terminal-note" data-i18n="terminalDescription">Run console commands on the device.</p>
+            </div>
+            <div class="terminal-output" id="terminalOutput"></div>
+            <div class="terminal-input-row">
+              <span class="terminal-prompt">&gt;</span>
+              <input type="text" id="terminalInput" class="terminal-input" data-i18n-placeholder="terminalPlaceholder" placeholder="Type a command and press Enter..." autocomplete="off" spellcheck="false">
+              <button type="button" class="btn-primary btn-sm" id="terminalRunButton" data-i18n="terminalRun">Run</button>
+              <button type="button" class="btn-secondary btn-sm" id="terminalClearButton" data-i18n="terminalClear">Clear</button>
             </div>
           </div>
         </div>

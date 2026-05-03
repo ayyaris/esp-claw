@@ -100,8 +100,7 @@ def patch_h_file(path: Path) -> bool:
 
 
 def patch_uac_file(path: Path) -> bool:
-    if path.exists() is False:
-        print(f'File {path} does not exist, skipping patch.')
+    if not path.exists():
         return False
     content = ensure_contains(path, 'ptr_is_writable')
     if UAC_PSRAM_COMMENTED_LINE in content:

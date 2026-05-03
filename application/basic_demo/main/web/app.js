@@ -18,6 +18,8 @@ const strings = {
     tabConfig: "Configuration",
     tabMemory: "Memory",
     tabFiles: "File Manager",
+    tabLua: "Lua",
+    tabTerminal: "Terminal",
 
     statusLoading: "Loading\u2026",
     statusOnline: "Wi-Fi Connected",
@@ -140,6 +142,21 @@ const strings = {
     fileSelectAndPath:
       "Select a file and provide a target path that starts with /.",
     fileFolderNameRequired: "Enter a folder name.",
+    tabTerminal: "Terminal",
+    terminalTitle: "Device Terminal",
+    terminalDescription: "Run console commands on the device.",
+    terminalPlaceholder: "Type a command and press Enter...",
+    terminalRun: "Run",
+    terminalClear: "Clear",
+    luaTitle: "Lua Scripts",
+    luaDescription: "Run Lua scripts on the device.",
+    luaFiles: "Script Files",
+    luaEditorLabel: "Editor",
+    luaRun: "Run",
+    luaClear: "Clear",
+    luaEmpty: "No Lua scripts found in /scripts.",
+    luaRunError: "Failed to run Lua script",
+    terminalError: "Failed to run command",
   },
 
   "zh-cn": {
@@ -271,6 +288,22 @@ const strings = {
     fileEditorSaveError: "保存文件失败",
     fileSelectAndPath: "请选择文件并提供以 / 开头的目标路径。",
     fileFolderNameRequired: "请输入文件夹名称。",
+    tabTerminal: "终端",
+    terminalTitle: "设备终端",
+    terminalDescription: "在设备上运行控制台命令。",
+    terminalPlaceholder: "输入命令并按回车...",
+    terminalRun: "运行",
+    terminalClear: "清空",
+    tabLua: "Lua",
+    luaTitle: "Lua 脚本",
+    luaDescription: "在设备上运行 Lua 脚本。",
+    luaFiles: "脚本文件",
+    luaEditorLabel: "编辑器",
+    luaRun: "运行",
+    luaClear: "清空",
+    luaEmpty: "/scripts 目录下未找到 Lua 脚本。",
+    luaRunError: "运行 Lua 脚本失败",
+    terminalError: "运行命令失败",
   },
 };
 
@@ -376,6 +409,11 @@ function initTabs() {
       if (btn.dataset.tab === "memory") {
         loadMemory().catch((err) =>
           showBanner("memoryBanner", err.message || t("memoryLoadError"), true)
+        );
+      }
+      if (btn.dataset.tab === "lua") {
+        loadLuaFiles().catch((err) =>
+          showBanner("luaBanner", err.message || t("luaRunError"), true)
         );
       }
     });
@@ -1402,18 +1440,149 @@ async function bootstrap() {
   }
 }
 
+// ── Terminal ──
+const terminalHistory = [];
+let terminalHistoryIndex = -1;
+
+async function runTerminalCommand() {
+  const input = document.getElementById("terminalInput");
+  const output = document.getElementById("terminalOutput");
+  const command = input.value.trim();
+  if (!command) return;
+
+  terminalHistory.push(command);
+  terminalHistoryIndex = terminalHistory.length;
+
+  const line = document.createElement("div");
+  line.className = "terminal-line terminal-cmd";
+  line.textContent = "> " + command;
+  output.appendChild(line);
+
+  input.value = "";
+  input.disabled = true;
+
+  try {
+    const res = await fetch("/api/cli/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command }),
+    });
+    const data = await res.json();
+    if (data.output) {
+      const outLine = document.createElement("pre");
+      outLine.className = "terminal-line terminal-out";
+      outLine.textContent = data.output;
+      output.appendChild(outLine);
+    }
+    if (!data.ok) {
+      const errLine = document.createElement("div");
+      errLine.className = "terminal-line terminal-err";
+      if (data.err !== 0) {
+        errLine.textContent = "Command not found";
+      } else {
+        errLine.textContent = "Exit code: " + (data.ret || "?");
+      }
+      output.appendChild(errLine);
+    }
+  } catch (err) {
+    const errLine = document.createElement("div");
+    errLine.className = "terminal-line terminal-err";
+    errLine.textContent = t("terminalError") + ": " + (err.message || "Unknown error");
+    output.appendChild(errLine);
+  }
+
+  input.disabled = false;
+  input.focus();
+  output.scrollTop = output.scrollHeight;
+}
+
+document.getElementById("terminalRunButton")?.addEventListener("click", runTerminalCommand);
+document.getElementById("terminalInput")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    runTerminalCommand();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (terminalHistoryIndex > 0) {
+      terminalHistoryIndex--;
+      document.getElementById("terminalInput").value = terminalHistory[terminalHistoryIndex];
+    }
+  } else if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (terminalHistoryIndex < terminalHistory.length - 1) {
+      terminalHistoryIndex++;
+      document.getElementById("terminalInput").value = terminalHistory[terminalHistoryIndex];
+    } else {
+      terminalHistoryIndex = terminalHistory.length;
+      document.getElementById("terminalInput").value = "";
+    }
+  }
+});
+document.getElementById("terminalClearButton")?.addEventListener("click", () => {
+  document.getElementById("terminalOutput").innerHTML = "";
+});
+
 // ── Lua Runner ──
+async function loadLuaFiles() {
+  const listEl = document.getElementById("luaFileList");
+  if (!listEl) return;
+  listEl.innerHTML = "";
+  try {
+    const res = await fetch("/api/files?path=/scripts", { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to list files");
+    const data = await res.json();
+    const luaFiles = (data.entries || []).filter((e) => !e.is_dir && e.name.endsWith(".lua"));
+    if (luaFiles.length === 0) {
+      listEl.innerHTML = `<p class="memory-note">${t("luaEmpty")}</p>`;
+      return;
+    }
+    luaFiles.forEach((file) => {
+      const row = document.createElement("div");
+      row.className = "lua-file-item";
+      const name = document.createElement("span");
+      name.className = "lua-file-name";
+      name.textContent = file.name;
+      const runBtn = document.createElement("button");
+      runBtn.className = "btn-primary btn-sm";
+      runBtn.textContent = t("luaRun");
+      runBtn.onclick = () => runLuaFile(file.name);
+      row.appendChild(name);
+      row.appendChild(runBtn);
+      listEl.appendChild(row);
+    });
+  } catch (err) {
+    listEl.innerHTML = `<p class="memory-note" style="color:var(--danger)">${err.message}</p>`;
+  }
+}
+
+async function runLuaFile(path) {
+  const output = document.getElementById("luaOutput");
+  output.classList.remove("hidden");
+  output.textContent = "Running " + path + "...";
+  try {
+    const res = await fetch("/api/lua/run_file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    const data = await res.json();
+    output.textContent = data.output || "(no output)";
+  } catch (err) {
+    output.textContent = t("luaRunError") + ": " + (err.message || "Unknown error");
+  }
+}
+
 async function runLuaScript() {
   const editor = document.getElementById("luaEditor");
   const output = document.getElementById("luaOutput");
   const script = editor.value;
   if (!script.trim()) {
     output.textContent = "Error: script is empty";
-    output.style.display = "block";
+    output.classList.remove("hidden");
     return;
   }
+  output.classList.remove("hidden");
   output.textContent = "Running...";
-  output.style.display = "block";
   try {
     const res = await fetch("/api/lua/run", {
       method: "POST",
@@ -1423,14 +1592,14 @@ async function runLuaScript() {
     const data = await res.json();
     output.textContent = data.output || "(no output)";
   } catch (err) {
-    output.textContent = "Error: " + (err.message || "Failed to run script");
+    output.textContent = t("luaRunError") + ": " + (err.message || "Failed to run script");
   }
 }
 
 document.getElementById("runLuaButton")?.addEventListener("click", runLuaScript);
 document.getElementById("clearLuaButton")?.addEventListener("click", () => {
   document.getElementById("luaEditor").value = "";
-  document.getElementById("luaOutput").style.display = "none";
+  document.getElementById("luaOutput").classList.add("hidden");
 });
 
 bootstrap().catch((err) => {

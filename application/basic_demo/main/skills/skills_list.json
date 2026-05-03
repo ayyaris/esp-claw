@@ -8,6 +8,12 @@
         "cap_time",
         "cap_web_search"
       ]
+    },
+    {
+      "id": "remote_control",
+      "file": "remote_control.md",
+      "summary": "How to remotely control and monitor the ESP-Claw device via web terminal, Lua runner, and Telegram CLI commands.",
+      "cap_groups": []
     }
   ]
 }

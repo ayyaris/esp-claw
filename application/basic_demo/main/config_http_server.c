@@ -21,7 +21,10 @@
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
+#include "esp_console.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 static const char *TAG = "config_http";
 
@@ -45,6 +48,7 @@ typedef struct {
 } config_http_server_ctx_t;
 
 static config_http_server_ctx_t s_ctx = {0};
+static SemaphoreHandle_t s_cli_mutex = NULL;
 
 static char *alloc_scratch_buffer(void)
 {
@@ -296,6 +300,45 @@ static esp_err_t lua_run_handler(httpd_req_t *req)
     }
 
     err = cap_lua_run_script("web_run.lua", args_json, 10000, run_out, sizeof(run_out));
+
+    cJSON_Delete(root);
+
+    cJSON *resp = cJSON_CreateObject();
+    if (!resp) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddBoolToObject(resp, "ok", err == ESP_OK);
+    cJSON_AddStringToObject(resp, "output", run_out);
+    char *resp_str = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
+    esp_err_t send_err = httpd_resp_sendstr(req, resp_str ? resp_str : "{}");
+    free(resp_str);
+    return send_err;
+}
+
+static esp_err_t lua_run_file_handler(httpd_req_t *req)
+{
+    cJSON *root = NULL;
+    esp_err_t err = parse_json_body(req, &root);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON body");
+        return err;
+    }
+
+    cJSON *path_item = cJSON_GetObjectItemCaseSensitive(root, "path");
+    if (!cJSON_IsString(path_item) || !path_item->valuestring[0]) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'path' field");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *path = path_item->valuestring;
+    char run_out[4096] = {0};
+    err = cap_lua_run_script(path, NULL, 10000, run_out, sizeof(run_out));
 
     cJSON_Delete(root);
 
@@ -868,6 +911,88 @@ static esp_err_t files_mkdir_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+static esp_err_t cli_run_handler(httpd_req_t *req)
+{
+    cJSON *root = NULL;
+    esp_err_t err = parse_json_body(req, &root);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON body");
+        return err;
+    }
+
+    cJSON *cmd_item = cJSON_GetObjectItemCaseSensitive(root, "command");
+    if (!cJSON_IsString(cmd_item) || !cmd_item->valuestring[0]) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'command' field");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *command = cmd_item->valuestring;
+
+    xSemaphoreTake(s_cli_mutex, portMAX_DELAY);
+
+    char temp_path[CONFIG_HTTP_PATH_MAX];
+    strlcpy(temp_path, s_ctx.storage_base_path, sizeof(temp_path));
+    if (strlcat(temp_path, "/.cli_tmp.txt", sizeof(temp_path)) >= sizeof(temp_path)) {
+        xSemaphoreGive(s_cli_mutex);
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Temp path too long");
+        return ESP_FAIL;
+    }
+
+    FILE *capture = fopen(temp_path, "w+");
+    if (!capture) {
+        xSemaphoreGive(s_cli_mutex);
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to open temp file");
+        return ESP_FAIL;
+    }
+
+    FILE *saved_stdout = stdout;
+    FILE *saved_stderr = stderr;
+    stdout = capture;
+    stderr = capture;
+
+    int cmd_ret = 0;
+    esp_err_t run_err = esp_console_run(command, &cmd_ret);
+
+    fflush(stdout);
+    stdout = saved_stdout;
+    stderr = saved_stderr;
+
+    long size = ftell(capture);
+    char *out_buf = NULL;
+    if (size > 0) {
+        out_buf = malloc(size + 1);
+        if (out_buf) {
+            rewind(capture);
+            fread(out_buf, 1, size, capture);
+            out_buf[size] = '\0';
+        }
+    }
+    fclose(capture);
+    unlink(temp_path);
+
+    xSemaphoreGive(s_cli_mutex);
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddBoolToObject(resp, "ok", run_err == ESP_OK && cmd_ret == 0);
+    cJSON_AddNumberToObject(resp, "ret", cmd_ret);
+    cJSON_AddNumberToObject(resp, "err", run_err);
+    cJSON_AddStringToObject(resp, "output", out_buf ? out_buf : "");
+    char *resp_str = cJSON_PrintUnformatted(resp);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
+    httpd_resp_sendstr(req, resp_str);
+
+    free(out_buf);
+    free(resp_str);
+    cJSON_Delete(resp);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 static esp_err_t captive_404_handler(httpd_req_t *req, httpd_err_code_t error)
 {
     if (!basic_demo_wifi_is_ap_active()) {
@@ -907,9 +1032,14 @@ esp_err_t config_http_server_start(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = BASIC_DEMO_HTTP_SERVER_PORT;
     config.ctrl_port = CONFIG_HTTP_CTRL_PORT;
-    config.max_uri_handlers = 16;
-    config.stack_size = 8192;
+    config.max_uri_handlers = 24;
+    config.stack_size = 16384;
     config.uri_match_fn = httpd_uri_match_wildcard;
+
+    s_cli_mutex = xSemaphoreCreateMutex();
+    if (!s_cli_mutex) {
+        return ESP_ERR_NO_MEM;
+    }
 
     ESP_RETURN_ON_ERROR(httpd_start(&s_ctx.server, &config), TAG, "Failed to start HTTP server");
 
@@ -930,6 +1060,8 @@ esp_err_t config_http_server_start(void)
         { .uri = "/api/files/upload", .method = HTTP_POST, .handler = files_upload_handler },
         { .uri = "/api/files/mkdir", .method = HTTP_POST, .handler = files_mkdir_handler },
         { .uri = "/api/lua/run", .method = HTTP_POST, .handler = lua_run_handler },
+        { .uri = "/api/lua/run_file", .method = HTTP_POST, .handler = lua_run_file_handler },
+        { .uri = "/api/cli/run", .method = HTTP_POST, .handler = cli_run_handler },
         { .uri = "/files/*", .method = HTTP_GET, .handler = file_download_handler },
     };
 

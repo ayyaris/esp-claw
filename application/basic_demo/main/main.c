@@ -213,7 +213,6 @@ void app_main(void)
     if (wifi_err != ESP_OK) {
         ESP_LOGE(TAG, "Wi-Fi start failed: %s", esp_err_to_name(wifi_err));
     } else {
-        ESP_ERROR_CHECK(config_http_server_start());
         if (captive_dns_start() != ESP_OK) {
             ESP_LOGW(TAG, "Captive DNS could not start, portal pop-up disabled");
         }
@@ -234,6 +233,10 @@ void app_main(void)
     }
 
     ESP_ERROR_CHECK(app_claw_start(&s_settings));
+
+    if (wifi_err == ESP_OK) {
+        ESP_ERROR_CHECK(config_http_server_start());
+    }
 
     esp_err_t guard_err = claw_skill_register_deactivate_guard("cap_lua_run",
                                                                cap_lua_run_deactivate_guard);
