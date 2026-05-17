@@ -15,6 +15,11 @@
 #include "lauxlib.h"
 #include "soc/soc_caps.h"
 
+/* SOC_PCNT_CHANNELS_PER_UNIT was removed in IDF v6; all supported chips have 2 */
+#ifndef SOC_PCNT_CHANNELS_PER_UNIT
+#define SOC_PCNT_CHANNELS_PER_UNIT 2
+#endif
+
 #define LUA_DRIVER_PCNT_METATABLE "pcnt.unit"
 #define LUA_DRIVER_PCNT_DEFAULT_LOW_LIMIT (-32768)
 #define LUA_DRIVER_PCNT_DEFAULT_HIGH_LIMIT 32767

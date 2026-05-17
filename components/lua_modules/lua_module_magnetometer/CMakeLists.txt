@@ -11,6 +11,7 @@ idf_component_register(
         nvs_flash
     PRIV_REQUIRES
         espressif__i2c_bus
+        esp_driver_gpio
 )
 
 idf_component_set_property(${COMPONENT_NAME} WHOLE_ARCHIVE TRUE)

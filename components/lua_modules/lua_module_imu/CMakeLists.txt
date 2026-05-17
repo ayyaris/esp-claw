@@ -25,6 +25,7 @@ idf_component_register(
         esp_board_manager
     PRIV_REQUIRES
         espressif__i2c_bus
+        esp_driver_gpio
 )
 
 if(CONFIG_LUA_MODULE_IMU_CHIP_BMI270)

@@ -215,6 +215,15 @@ menu "App Claw Config"
                 Enable the UART Lua driver and keep app_claw's direct dependency
                 on lua_driver_uart when Lua capability is enabled.
 
+        config APP_CLAW_LUA_DRIVER_CANBUS
+            bool "Enable CAN bus Lua driver"
+            default y if SOC_TWAI_SUPPORTED
+            default n
+            help
+                Enable the CAN bus Lua driver (TWAI peripheral) and keep app_claw's
+                direct dependency on lua_driver_canbus when Lua capability is enabled.
+                Defaults to n on chips without TWAI hardware support.
+
         comment "--- Higher-level modules (lua_module) ---"
 
         config APP_CLAW_LUA_MODULE_AUDIO

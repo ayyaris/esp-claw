@@ -6,6 +6,7 @@ idf_component_register(
     REQUIRES
         cap_lua
         esp_lcd
+        esp_driver_spi
         esp_lcd_gc9107
         esp_lcd_gc9b71
         esp_lcd_gc9d01

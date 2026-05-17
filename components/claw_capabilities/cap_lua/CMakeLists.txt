@@ -14,5 +14,5 @@ idf_component_register(
         esp_timer
         freertos
         georgik__lua
-        json
+        espressif__cjson
 )

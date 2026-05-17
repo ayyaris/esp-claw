@@ -145,6 +145,12 @@ dependencies:
       - if: $CONFIG{APP_CLAW_LUA_DRIVER_UART} == True
     path: ../../lua_modules/lua_driver_uart
 
+  lua_driver_canbus:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_DRIVER_CANBUS} == True
+    path: ../../lua_modules/lua_driver_canbus
+
   # --- lua_module (higher-level modules) ---
 
   lua_module_audio:

@@ -7,5 +7,5 @@ idf_component_register(
         claw_cap
         console
         freertos
-        json
+        espressif__cjson
 )

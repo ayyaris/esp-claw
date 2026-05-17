@@ -35,6 +35,9 @@
 #if CONFIG_APP_CLAW_LUA_DRIVER_UART
 #include "lua_driver_uart.h"
 #endif
+#if CONFIG_APP_CLAW_LUA_DRIVER_CANBUS
+#include "lua_driver_canbus.h"
+#endif
 
 /* --- lua_module (higher-level modules) --- */
 #if CONFIG_APP_CLAW_LUA_MODULE_AUDIO && defined(CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT)
@@ -281,6 +284,14 @@ static esp_err_t app_lua_register_uart(const char *fatfs_base_path)
 }
 #endif
 
+#if CONFIG_APP_CLAW_LUA_DRIVER_CANBUS
+static esp_err_t app_lua_register_canbus(const char *fatfs_base_path)
+{
+    (void)fatfs_base_path;
+    return lua_driver_canbus_register();
+}
+#endif
+
 /* --- lua_module register wrappers --- */
 
 #if CONFIG_APP_CLAW_LUA_MODULE_AUDIO && defined(CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT)
@@ -472,6 +483,9 @@ static const app_lua_module_entry_t s_lua_module_entries[] = {
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_UART
     { "uart", "UART", app_lua_register_uart },
+#endif
+#if CONFIG_APP_CLAW_LUA_DRIVER_CANBUS
+    { "canbus", "CAN Bus", app_lua_register_canbus },
 #endif
     /* --- lua_module (higher-level modules) --- */
 #if CONFIG_APP_CLAW_LUA_MODULE_AUDIO && defined(CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT)

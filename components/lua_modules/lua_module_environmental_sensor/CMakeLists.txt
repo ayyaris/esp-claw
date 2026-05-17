@@ -8,6 +8,7 @@ set(env_sensor_requires
 
 set(env_sensor_priv_requires
     espressif__esp_board_manager
+    esp_driver_gpio
 )
 
 if(CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690)

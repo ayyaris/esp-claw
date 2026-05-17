@@ -1,5 +1,8 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  espressif/cjson:
+    version: ">=1.7.15"
+
   espressif/esp_board_manager:
     version: "^0.5.10"
     public: true

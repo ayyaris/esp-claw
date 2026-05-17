@@ -6,5 +6,5 @@ idf_component_register(
     REQUIRES
         claw_cap
         claw_event_router
-        json
+        espressif__cjson
 )

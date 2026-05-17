@@ -6,5 +6,5 @@ idf_component_register(
     REQUIRES
         cap_lua
         claw_cap
-        json
+        espressif__cjson
 )

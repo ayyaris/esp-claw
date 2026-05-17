@@ -46,7 +46,13 @@ idf_component_register(
         esp_timer
         esp_websocket_client
         freertos
-        json
+        espressif__cjson
         mbedtls
+        esp_rom
         console
+)
+
+# mbedtls/base64.h moved to tf-psa-crypto/include in IDF v6; expose it privately.
+target_include_directories(${COMPONENT_LIB} PRIVATE
+    $ENV{IDF_PATH}/components/mbedtls/mbedtls/tf-psa-crypto/include
 )

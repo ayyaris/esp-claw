@@ -13,7 +13,7 @@ idf_component_register(
         esp_http_client
         http_reuse
         esp_netif
-        json
+        espressif__cjson
         mdns
         console
 )
